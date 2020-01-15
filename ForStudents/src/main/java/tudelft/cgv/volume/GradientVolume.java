@@ -75,12 +75,61 @@ public class GradientVolume {
 //////////////////////////////////////////////////////////////////////
 // This function should return linearly interpolated gradient for position coord[]
 // right now it returns the nearest neighbour        
-        
-    public VoxelGradient getGradient(double[] coord) {
-        
-        // to be implemented
+private float interpolate(float g0, float g1, float factor) {
+    float result = (1 - factor)*g0 + factor*g1;
+    return result;
+}
+    public  VoxelGradient getGradient(double[] coord) {
 
-        return getGradientNN(coord);
+        if (coord[0] < 0 || coord[0] > (dimX-2) || coord[1] < 0 || coord[1] > (dimY-2)
+                || coord[2] < 0 || coord[2] > (dimZ-2)) {
+            return new VoxelGradient(0,0,0);
+        }
+        /* notice that in this framework we assume that the distance between neighbouring voxels is 1 in all directions*/
+        int x = (int) Math.floor(coord[0]);
+        int y = (int) Math.floor(coord[1]);
+        int z = (int) Math.floor(coord[2]);
+
+        float fac_x = (float) coord[0] - x;
+        float fac_y = (float) coord[1] - y;
+        float fac_z = (float) coord[2] - z;
+
+        VoxelGradient interpolated = new VoxelGradient();
+
+        float t0 = interpolate(getGradient(x, y, z).x, getGradient(x+1, y, z).x, fac_x);
+        float t1 = interpolate(getGradient(x, y+1, z).x, getGradient(x+1, y+1, z).x, fac_x);
+        float t2 = interpolate(getGradient(x, y, z+1).x, getGradient(x+1, y, z+1).x, fac_x);
+        float t3 = interpolate(getGradient(x, y+1, z+1).x, getGradient(x+1, y+1, z+1).x, fac_x);
+        float t4 = interpolate(t0, t1, fac_y);
+        float t5 = interpolate(t2, t3, fac_y);
+        float t6 = interpolate(t4, t5, fac_z);
+
+
+        interpolated.x=t6;
+
+        t0 = interpolate(getGradient(x, y, z).y, getGradient(x+1, y, z).y, fac_x);
+        t1 = interpolate(getGradient(x, y+1, z).y, getGradient(x+1, y+1, z).y, fac_x);
+        t2 = interpolate(getGradient(x, y, z+1).y, getGradient(x+1, y, z+1).y, fac_x);
+        t3 = interpolate(getGradient(x,y+1,z+1).y, getGradient(x+1, y+1, z+1).y, fac_x);
+        t4 = interpolate(t0, t1, fac_y);
+        t5 = interpolate(t2, t3, fac_y);
+        t6 = interpolate(t4, t5, fac_z);
+
+
+        interpolated.y=t6;
+
+         t0 = interpolate(getGradient(x, y, z).z, getGradient(x+1, y, z).z, fac_x);
+         t1 = interpolate(getGradient(x, y+1, z).z, getGradient(x+1, y+1, z).z, fac_x);
+         t2 = interpolate(getGradient(x, y, z+1).z, getGradient(x+1, y, z+1).z, fac_x);
+         t3 = interpolate(getGradient(x, y+1, z+1).z, getGradient(x+1, y+1, z+1).z, fac_x);
+         t4 = interpolate(t0, t1, fac_y);
+         t5 = interpolate(t2, t3, fac_y);
+         t6 = interpolate(t4, t5, fac_z);
+
+
+        interpolated.z=t6;
+
+        return interpolated;
 
     }
     

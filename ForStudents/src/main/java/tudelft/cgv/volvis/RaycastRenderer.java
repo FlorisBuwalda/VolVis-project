@@ -17,6 +17,7 @@ import tudelft.cgv.volume.Volume;
 import tudelft.cgv.volume.VoxelGradient;
 
 import java.awt.Color;
+import java.util.Vector;
 
 
 /**
@@ -241,6 +242,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         double diffsum = Math.sqrt(dx*dx+dy*dy+dz*dz);
 
         double isovalue = 0;
+       VoxelGradient gradient = new VoxelGradient();
         for (double step=0; step<steps; step++){
             currentPoint[0]= entryPoint[0]+ step*sampleStep*dx/diffsum;
             currentPoint[1]= entryPoint[1]+ step*sampleStep*dy/diffsum;
@@ -251,19 +253,23 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
            /// System.out.println(voxel);
            if (isovalue ==0 && voxel >= iso_value){
                isovalue = 1;
+               gradient = gradients.getGradient(currentPoint);
+              // System.out.println(gradient.x+gradient.y+gradient.z+gradient.mag);
 
            }
         }
 
 
-        
+        TFColor Phongcolor = computePhongShading(isoColor,gradient,lightVector,rayVector);
+        //System.out.println(Phongcolor);
          // isoColor contains the isosurface color from the interface
-         r = isoColor.r;
-         g = isoColor.g;
-         b = isoColor.b;
+         r = Phongcolor.r;
+         g = Phongcolor.g;
+         b = Phongcolor.b;
          alpha =isovalue;
         //computes the color
         int color = computeImageColor(r,g,b,alpha);
+
         return color;
     }
    
@@ -340,65 +346,92 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
     public TFColor computePhongShading(TFColor voxel_color, VoxelGradient gradient, double[] lightVector,
             double[] rayVector) {
 
-        // To be implemented 
-        
-        TFColor color = new TFColor(0,0,0,1);
-        
-        
+      double Ka=.1;
+      double Kd = .7;
+      double ks = .2;
+      int alpha = 100;
+        double[] L = VectorMath.normalize(lightVector);
+       // System.out.println(gradient.x + " " + gradient.y + " " + gradient.z);
+        double[] N = {gradient.x,gradient.y,gradient.z};
+        N = VectorMath.normalize(N);
+        double[] V = VectorMath.normalize(rayVector);
+
+        double factor = 2* VectorMath.dotproduct(L,N);
+        double[] R = {factor*N[0]-L[0],factor*N[1]-L[1],factor*N[2]-L[2]};
+        R = VectorMath.normalize((R));
+
+       // System.out.println(L.length + " "+ N.length +" "+ V.length +" "+ R.length);
+      //  System.out.println(L[0] + " "+ L[1] +" "+ L[2]  +" "+ Math.sqrt(L[0]*L[0]+L[1]*L[1]+L[2]*L[2])  );
+
+
+    TFColor Lightcolor = new TFColor(1.0,1.0,1.0,1);
+
+    double outputR = Lightcolor.r*voxel_color.r*Ka + Lightcolor.r*voxel_color.r*Kd*(VectorMath.dotproduct(N,L)) + Lightcolor.r*voxel_color.r*Math.pow(VectorMath.dotproduct(R,V),alpha);
+    double outputG = Lightcolor.g*voxel_color.g*Ka + Lightcolor.g*voxel_color.g*Kd*(VectorMath.dotproduct(N,L)) + Lightcolor.g*voxel_color.g*Math.pow(VectorMath.dotproduct(R,V),alpha);
+    double outputB = Lightcolor.b*voxel_color.b*Ka + Lightcolor.b*voxel_color.b*Kd*(VectorMath.dotproduct(N,L)) + Lightcolor.b*voxel_color.b*Math.pow(VectorMath.dotproduct(R,V),alpha);
+
+    //System.out.println(outputR +" " +outputG +" " + outputB);
+        //System.out.println(N[0] + " " + N[1] + " " + N[2]);
+       // System.out.println(L[0] + " "+ L[1]+ " "+ L[2]);
+
+    // System.out.println(Lightcolor.r*voxel_color.r*Ka + " " + Lightcolor.r*voxel_color.r*Kd*(VectorMath.dotproduct(N,L)) + " "+ Lightcolor.r*voxel_color.r*Math.pow(VectorMath.dotproduct(R,V),alpha) );
+    TFColor color = new TFColor(outputR,outputG,outputB,1);
+
+
         return color;
-    }
-    
-    
+}
+
+
     //////////////////////////////////////////////////////////////////////
     ///////////////// LIMITED MODIFICATION IS NEEDED /////////////////////
-    ////////////////////////////////////////////////////////////////////// 
+    //////////////////////////////////////////////////////////////////////
     // Implements the basic tracing of rays trough the image and given the
     // camera transformation
     // It calls the functions depending on the raycasting mode
-  
+
     public void raycast(double[] viewMatrix) {
 
-    	//data allocation
+        //data allocation
         double[] viewVec = new double[3];
         double[] uVec = new double[3];
         double[] vVec = new double[3];
         double[] pixelCoord = new double[3];
         double[] entryPoint = new double[3];
         double[] exitPoint = new double[3];
-        
+
         // increment in the pixel domain in pixel units
         int increment = 1;
         // sample step in voxel units
         int sampleStep = 1;
         // reset the image to black
         resetImage();
-        
-        // vector uVec and vVec define the view plane, 
+
+        // vector uVec and vVec define the view plane,
         // perpendicular to the view vector viewVec which is going from the view point towards the object
         // uVec contains the up vector of the camera in world coordinates (image vertical)
         // vVec contains the horizontal vector in world coordinates (image horizontal)
         getViewPlaneVectors(viewMatrix,viewVec,uVec,vVec);
-        
-        
+
+
         // The result of the visualization is saved in an image(texture)
         // we update the vector according to the resolution factor
-        // If the resolution is 0.25 we will sample 4 times more points. 
+        // If the resolution is 0.25 we will sample 4 times more points.
         for(int k=0;k<3;k++)
         {
             uVec[k]=res_factor*uVec[k];
             vVec[k]=res_factor*vVec[k];
         }
-        
-       // We get the size of the image/texture we will be puting the result of the 
+
+        // We get the size of the image/texture we will be puting the result of the
         // volume rendering operation.
         int imageW=image.getWidth();
         int imageH=image.getHeight();
 
         int[] imageCenter = new int[2];
-        // Center of the image/texture 
+        // Center of the image/texture
         imageCenter[0]= imageW/2;
         imageCenter[1]= imageH/2;
-        
+
         // imageW/ image H contains the real width of the image we will use given the resolution. 
         //The resolution is generated once based on the maximum resolution.
         imageW = (int) (imageW*((max_res_factor/res_factor)));

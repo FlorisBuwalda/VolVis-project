@@ -4,6 +4,8 @@
  */
 package tudelft.cgv.util;
 
+import javax.swing.*;
+
 /**
  *
  * @author michel and modified by Anna Vilanova
@@ -44,6 +46,21 @@ public class VectorMath {
         r[2] = v[0] * w[1] - v[1] * w[0];
         return r;
     }
+
+    public static double[] normalize(double[]v){
+        double[] result = new double[3];
+        if (length(v)>0) {
+            result[0] = v[0] / length(v);
+            result[1] = v[1] / length(v);
+            result[2] = v[2] / length(v);
+
+            return result;
+        }
+        else{
+            return v;
+        }
+    }
+
     
     // compute length of vector v
     public static double length(double[] v) {
