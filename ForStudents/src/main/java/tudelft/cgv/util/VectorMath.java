@@ -61,6 +61,23 @@ public class VectorMath {
         }
     }
 
+    public static double[] add(double[]v ,double[]w){
+
+        double[] result = new double[v.length];
+        for (int i =0; i<v.length; i++) {
+            result[i] = v[i] + w[i];
+        }
+        return result;
+    }
+    public static double[] multiply(double[]v ,double w){
+
+        double[] result = new double[v.length];
+        for (int i =0; i<v.length; i++) {
+            result[i] = v[i] *w;
+        }
+        return result;
+    }
+
     
     // compute length of vector v
     public static double length(double[] v) {

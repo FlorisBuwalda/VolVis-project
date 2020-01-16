@@ -16,9 +16,6 @@ import tudelft.cgv.volume.GradientVolume;
 import tudelft.cgv.volume.Volume;
 import tudelft.cgv.volume.VoxelGradient;
 
-import java.awt.Color;
-import java.util.Vector;
-
 
 /**
  *
@@ -242,21 +239,57 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         double diffsum = Math.sqrt(dx*dx+dy*dy+dz*dz);
 
         double isovalue = 0;
+       // double[] increments = new double[3];
+        float voxel=0 ;float previousvalue=0;
        VoxelGradient gradient = new VoxelGradient();
         for (double step=0; step<steps; step++){
+            double[] previouspoint = currentPoint.clone();
+
             currentPoint[0]= entryPoint[0]+ step*sampleStep*dx/diffsum;
             currentPoint[1]= entryPoint[1]+ step*sampleStep*dy/diffsum;
             currentPoint[2]= entryPoint[2]+ step*sampleStep*dz/diffsum;
 
-            //var voxel =  volume.getVoxelNN(currentPoint);
-            var voxel =  volume.getVoxelLinearInterpolate(currentPoint);
-           /// System.out.println(voxel);
-           if (isovalue ==0 && voxel >= iso_value){
-               isovalue = 1;
-               gradient = gradients.getGradient(currentPoint);
-              // System.out.println(gradient.x+gradient.y+gradient.z+gradient.mag);
 
+            previousvalue = voxel;
+
+            voxel =  volume.getVoxelLinearInterpolate(currentPoint);
+
+
+          // bisection_accuracy (currentPoint, previouspoint,sampleStep,  previousvalue,voxel,  iso_value, gradient,isovalue);
+
+            if (previousvalue < iso_value && voxel >= iso_value) {
+                double tol = .01;
+                int n = 0;
+                double[] midpoint = currentPoint.clone();
+                while (n < 10) {
+                    midpoint = VectorMath.multiply(VectorMath.add(currentPoint, previouspoint), .5);
+
+                    double midval = volume.getVoxelLinearInterpolate(midpoint);
+                    if (Math.abs(iso_value - midval) < tol) {
+
+                        break;
+
+                    }
+
+                    n++;
+
+                    if (midval < iso_value) {
+                        previouspoint = midpoint.clone();
+
+                    } else {
+                        currentPoint = midpoint.clone();
+                    }
+
+                }
+
+                gradient=  gradients.getGradient(midpoint);
+                isovalue = 1;
+                
+            }
+           if (isovalue>0){
+               break;
            }
+
         }
 
 
@@ -280,10 +313,50 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
     // Given the current sample position, increment vector of the sample (vector from previous sample to current sample) and sample Step. 
    // Previous sample value and current sample value, isovalue value
     // The function should search for a position where the iso_value passes that it is more precise.
-   public void  bisection_accuracy (double[] currentPos, double[] increments,double sampleStep, float previousvalue,float value, float iso_value)
-   {
+   public void bisection_accuracy (double[] currentPos, double[] previousPos,double sampleStep, float previousvalue,float voxelvalue, float iso_value, VoxelGradient gradient, double isovalue ) {
+       // if (isovalue ==0 && voxel >= iso_value){
+       //     isovalue = 1;
+       //     gradient = gradients.getGradient(currentPoint);
+       //     // System.out.println(gradient.x+gradient.y+gradient.z+gradient.mag);
 
-           // to be implemented
+       // }
+       if (previousvalue < iso_value && voxelvalue >= iso_value) {
+           double tol = .01;
+           int n = 0;
+           double[] midpoint = currentPos.clone();
+           while (n < 10) {
+               midpoint = VectorMath.multiply(VectorMath.add(currentPos, previousPos), .5);
+
+               double midval = volume.getVoxelLinearInterpolate(midpoint);
+               System.out.println(midpoint[0] + " "+ midpoint[1] +" "+ midpoint[2] + " "+ midval);
+               if (Math.abs(iso_value - midval) < tol) {
+                   gradient = gradients.getGradient(midpoint);
+                   isovalue = 1;
+
+               }
+
+               n++;
+
+               if (midval < iso_value) {
+                   previousPos = midpoint.clone();
+
+               } else {
+                   currentPos = midpoint.clone();
+               }
+
+
+
+
+           }
+
+           gradient=  gradients.getGradient(midpoint);
+           isovalue = 1;
+          // System.out.println(n + " " + isovalue);
+
+
+       }
+      // System.out.println(gradient.x + " " + gradient.y + " "  + gradient.z);
+
    }
     
     //////////////////////////////////////////////////////////////////////
@@ -445,34 +518,78 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         double[] volumeCenter = new double[3];
         computeVolumeCenter(volumeCenter);
 
-        
+        int size = ((imageCenter[1]+imageH/2)-(imageCenter[1]-imageH/2))/increment;
+       // System.out.println(size);
+        threadtest[] threadarray = new threadtest[size] ;
+        int k = 0;
         // ray computation for each pixel
-        for (int j = imageCenter[1] - imageH/2; j < imageCenter[1] + imageH/2; j += increment) {
-            for (int i =  imageCenter[0] - imageW/2; i <imageCenter[0] + imageW/2; i += increment) {
-                // compute starting points of rays in a plane shifted backwards to a position behind the data set
-            	computePixelCoordinatesBehindFloat(pixelCoord,viewVec,uVec,vVec,i,j);
-            	// compute the entry and exit point of the ray
-                computeEntryAndExit(pixelCoord, rayVector, entryPoint, exitPoint);
-                if ((entryPoint[0] > -1.0) && (exitPoint[0] > -1.0)) {
-                    int val = 0;
-                    if (compositingMode || tf2dMode) {
-                        val = traceRayComposite(entryPoint, exitPoint, rayVector, sampleStep);
-                    } else if (mipMode) {
-                        val = traceRayMIP(entryPoint, exitPoint, rayVector, sampleStep);
-                    } else if (isoMode){
-                        val= traceRayIso(entryPoint,exitPoint,rayVector, sampleStep);
-                    }
-                    for (int ii = i; ii < i + increment; ii++) {
-                        for (int jj = j; jj < j + increment; jj++) {
-                            image.setRGB(ii, jj, val);
-                        }
-                    }
-                }
+            for (int j = imageCenter[1] - imageH/2; j < imageCenter[1] + imageH/2; j += increment) {
 
+                threadobject params = new threadobject(viewVec, uVec, vVec, increment, sampleStep, imageW, imageCenter[0], rayVector, j);
+                threadarray[k]= new threadtest(params);
+                threadarray[k].start();
+
+
+                k++;
             }
-        }
+            for(threadtest thread : threadarray){
+                try {
+                    thread.join();
+                }
+                catch(InterruptedException e){}
+            }
     }
 
+    public class threadtest extends Thread
+
+    {
+        private threadobject params;
+        private threadtest(threadobject params){
+            this.params = params;
+        }
+
+        @Override
+        public void run(){
+            int i1 = params.getI1();
+            int imageW = params.getImageW();
+            int increment = params.getIncrement();
+            //double[] pixelCoord = params.getPixelCoord();
+            double[] viewVec = params.getViewVec();
+            double[] uVec = params.getuVec();
+            double[] vVec = params.getvVec();
+            double [] rayVector = params.getRayVector();
+            //double[] entryPoint = params.getEntryPoint();
+            //double[] exitPoint = params.getExitPoint();
+            int sampleStep = params.getSampleStep();
+            int j = params.getJ();
+
+        for (int i = i1 - imageW / 2; i < i1 + imageW / 2; i += increment) {
+            double[] pixelCoord= new double[3];
+            double[] entryPoint= new double[3];
+            double[] exitPoint = new double[3] ;
+            // compute starting points of rays in a plane shifted backwards to a position behind the data set
+            computePixelCoordinatesBehindFloat(pixelCoord, viewVec, uVec, vVec, i, j);
+            // compute the entry and exit point of the ray
+            computeEntryAndExit(pixelCoord, rayVector, entryPoint, exitPoint);
+            if ((entryPoint[0] > -1.0) && (exitPoint[0] > -1.0)) {
+                int val = 0;
+                if (compositingMode || tf2dMode) {
+                    val = traceRayComposite(entryPoint, exitPoint, rayVector, sampleStep);
+                } else if (mipMode) {
+                    val = traceRayMIP(entryPoint, exitPoint, rayVector, sampleStep);
+                } else if (isoMode) {
+                    val = traceRayIso(entryPoint, exitPoint, rayVector, sampleStep);
+                }
+                for (int ii = i; ii < i + increment; ii++) {
+                    for (int jj = j; jj < j + increment; jj++) {
+                        image.setRGB(ii, jj, val);
+                    }
+                }
+            }
+
+        }
+    }
+    }
 
 //////////////////////////////////////////////////////////////////////
 ///////////////// FUNCTION TO BE IMPLEMENTED /////////////////////////
