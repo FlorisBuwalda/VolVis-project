@@ -284,7 +284,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 
                 gradient=  gradients.getGradient(midpoint);
                 isovalue = 1;
-                
+
             }
            if (isovalue>0){
                break;
