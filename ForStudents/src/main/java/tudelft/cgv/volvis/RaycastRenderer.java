@@ -231,6 +231,8 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 
         // To be Implemented this function right now just gives back a constant color
         double[] currentPoint =new double[3];
+
+        //calculate number of sample steps for loop termination
         double steps = VectorMath.distance(entryPoint,exitPoint)/sampleStep;
 
         double dx=exitPoint[0]-entryPoint[0];
@@ -239,34 +241,46 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         double diffsum = Math.sqrt(dx*dx+dy*dy+dz*dz);
 
         double isovalue = 0;
-       // double[] increments = new double[3];
+
         float voxel=0 ;float previousvalue=0;
+
+        //loop over all steps
        VoxelGradient gradient = new VoxelGradient();
         for (double step=0; step<steps; step++){
+            //save previous point for bisection
             double[] previouspoint = currentPoint.clone();
 
+            //increment current point by 1 step
             currentPoint[0]= entryPoint[0]+ step*sampleStep*dx/diffsum;
             currentPoint[1]= entryPoint[1]+ step*sampleStep*dy/diffsum;
             currentPoint[2]= entryPoint[2]+ step*sampleStep*dz/diffsum;
 
-
+            //save previous voxel for bisection
             previousvalue = voxel;
 
+            //obtain current voxel value with either linear or cubic interpolation
           //  voxel =  volume.getVoxelLinearInterpolate(currentPoint);
             voxel = volume.getVoxelTriCubicInterpolate(currentPoint);
 
-
+            //has no access to local variables so we simply replace the function call by the function itself.
           // bisection_accuracy (currentPoint, previouspoint,sampleStep,  previousvalue,voxel,  iso_value, gradient,isovalue);
 
+            //only engage bisection algorithm if we know the iso value is hit somewhere between previous and current voxel
             if (previousvalue < iso_value && voxel >= iso_value) {
+                //algorithm tolerance;
                 double tol = .01;
                 int n = 0;
                 double[] midpoint = currentPoint.clone();
+                //max 10 iterations
                 while (n < 10) {
+                    //midpoint is half the sum of previous and current point
                     midpoint = VectorMath.multiply(VectorMath.add(currentPoint, previouspoint), .5);
 
+                    //get interpolated value at midpoint with either cubic or linear interpolation
                    // double midval = volume.getVoxelLinearInterpolate(midpoint);
                    double midval =  volume.getVoxelTriCubicInterpolate(midpoint);
+
+                   //we break the algorithm if the current midpoint interpolation is close enough to the desired iso value
                     if (Math.abs(iso_value - midval) < tol) {
 
                         break;
@@ -274,7 +288,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                     }
 
                     n++;
-
+                    // here we decide whether we look for the new aproximation to the right or to the left of current midpoint.
                     if (midval < iso_value) {
                         previouspoint = midpoint.clone();
 
@@ -284,23 +298,27 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 
                 }
 
+                //loop has terminated so midpoint is now our best approximation of isovalue location
                 gradient=  gradients.getGradient(midpoint);
                 isovalue = 1;
 
             }
+            //we are done if we have a hit
            if (isovalue>0){
                break;
            }
 
         }
 
-
+        //compute phong shading color
         TFColor Phongcolor = computePhongShading(isoColor,gradient,lightVector,rayVector);
-        //System.out.println(Phongcolor);
+
          // isoColor contains the isosurface color from the interface
          r = Phongcolor.r;
          g = Phongcolor.g;
          b = Phongcolor.b;
+
+
          alpha =isovalue;
         //computes the color
         int color = computeImageColor(r,g,b,alpha);
@@ -315,6 +333,8 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
     // Given the current sample position, increment vector of the sample (vector from previous sample to current sample) and sample Step. 
    // Previous sample value and current sample value, isovalue value
     // The function should search for a position where the iso_value passes that it is more precise.
+
+    //WE DONT USE THIS! needs access to local variables so it is no longer a function
    public void bisection_accuracy (double[] currentPos, double[] previousPos,double sampleStep, float previousvalue,float voxelvalue, float iso_value, VoxelGradient gradient, double isovalue ) {
        // if (isovalue ==0 && voxel >= iso_value){
        //     isovalue = 1;
@@ -421,6 +441,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
     public TFColor computePhongShading(TFColor voxel_color, VoxelGradient gradient, double[] lightVector,
             double[] rayVector) {
 
+        //define constants
       double Ka=.1;
       double Kd = .7;
       double Ks = .2;
@@ -442,6 +463,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 
     TFColor Lightcolor = new TFColor(1.0,1.0,1.0,1);
 
+    //apply phong model component wise for R,G and B
     double outputR = Lightcolor.r*voxel_color.r*Ka + Lightcolor.r*voxel_color.r*Kd*(VectorMath.dotproduct(N,L)) + Lightcolor.r*voxel_color.r*Ks*Math.pow(VectorMath.dotproduct(R,V),alpha);
     double outputG = Lightcolor.g*voxel_color.g*Ka + Lightcolor.g*voxel_color.g*Kd*(VectorMath.dotproduct(N,L)) + Lightcolor.g*voxel_color.g*Ks*Math.pow(VectorMath.dotproduct(R,V),alpha);
     double outputB = Lightcolor.b*voxel_color.b*Ka + Lightcolor.b*voxel_color.b*Kd*(VectorMath.dotproduct(N,L)) + Lightcolor.b*voxel_color.b*Ks*Math.pow(VectorMath.dotproduct(R,V),alpha);
@@ -515,20 +537,26 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         double[] volumeCenter = new double[3];
         computeVolumeCenter(volumeCenter);
 
+        //compute loop size
         int size = ((imageCenter[1]+imageH/2)-(imageCenter[1]-imageH/2))/increment;
-       // System.out.println(size);
+
+        //initialize array of threads equal to size, 1 thread = 1 column of pixels
         threadtest[] threadarray = new threadtest[size] ;
+
         int k = 0;
         // ray computation for each pixel
             for (int j = imageCenter[1] - imageH/2; j < imageCenter[1] + imageH/2; j += increment) {
-
+                //define thread input parameters
                 threadobject params = new threadobject(viewVec, uVec, vVec, increment, sampleStep, imageW, imageCenter[0], rayVector, j);
+                // initialize thread
                 threadarray[k]= new threadtest(params);
+                //tell thread to start executing
                 threadarray[k].start();
 
 
                 k++;
             }
+            //after initializing all threads, main thread must wait for all threads to terminate
             for(threadtest thread : threadarray){
                 try {
                     thread.join();
@@ -560,6 +588,8 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             int sampleStep = params.getSampleStep();
             int j = params.getJ();
 
+
+            //this is basically a copy of the original code
         for (int i = i1 - imageW / 2; i < i1 + imageW / 2; i += increment) {
             double[] pixelCoord= new double[3];
             double[] entryPoint= new double[3];
