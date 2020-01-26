@@ -252,7 +252,8 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 
             previousvalue = voxel;
 
-            voxel =  volume.getVoxelLinearInterpolate(currentPoint);
+          //  voxel =  volume.getVoxelLinearInterpolate(currentPoint);
+            voxel = volume.getVoxelTriCubicInterpolate(currentPoint);
 
 
           // bisection_accuracy (currentPoint, previouspoint,sampleStep,  previousvalue,voxel,  iso_value, gradient,isovalue);
@@ -264,7 +265,8 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                 while (n < 10) {
                     midpoint = VectorMath.multiply(VectorMath.add(currentPoint, previouspoint), .5);
 
-                    double midval = volume.getVoxelLinearInterpolate(midpoint);
+                   // double midval = volume.getVoxelLinearInterpolate(midpoint);
+                   double midval =  volume.getVoxelTriCubicInterpolate(midpoint);
                     if (Math.abs(iso_value - midval) < tol) {
 
                         break;
@@ -421,35 +423,30 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 
       double Ka=.1;
       double Kd = .7;
-      double ks = .2;
+      double Ks = .2;
       int alpha = 100;
+
+      //define vectors necessary for Phong Shading. Note that they must be normalized.
         double[] L = VectorMath.normalize(lightVector);
-       // System.out.println(gradient.x + " " + gradient.y + " " + gradient.z);
         double[] N = {gradient.x,gradient.y,gradient.z};
+
         N = VectorMath.normalize(N);
         double[] V = VectorMath.normalize(rayVector);
-
         double factor = 2* VectorMath.dotproduct(L,N);
+        // reflection vector
         double[] R = {factor*N[0]-L[0],factor*N[1]-L[1],factor*N[2]-L[2]};
         R = VectorMath.normalize((R));
 
-       // System.out.println(L.length + " "+ N.length +" "+ V.length +" "+ R.length);
-      //  System.out.println(L[0] + " "+ L[1] +" "+ L[2]  +" "+ Math.sqrt(L[0]*L[0]+L[1]*L[1]+L[2]*L[2])  );
+
 
 
     TFColor Lightcolor = new TFColor(1.0,1.0,1.0,1);
 
-    double outputR = Lightcolor.r*voxel_color.r*Ka + Lightcolor.r*voxel_color.r*Kd*(VectorMath.dotproduct(N,L)) + Lightcolor.r*voxel_color.r*Math.pow(VectorMath.dotproduct(R,V),alpha);
-    double outputG = Lightcolor.g*voxel_color.g*Ka + Lightcolor.g*voxel_color.g*Kd*(VectorMath.dotproduct(N,L)) + Lightcolor.g*voxel_color.g*Math.pow(VectorMath.dotproduct(R,V),alpha);
-    double outputB = Lightcolor.b*voxel_color.b*Ka + Lightcolor.b*voxel_color.b*Kd*(VectorMath.dotproduct(N,L)) + Lightcolor.b*voxel_color.b*Math.pow(VectorMath.dotproduct(R,V),alpha);
+    double outputR = Lightcolor.r*voxel_color.r*Ka + Lightcolor.r*voxel_color.r*Kd*(VectorMath.dotproduct(N,L)) + Lightcolor.r*voxel_color.r*Ks*Math.pow(VectorMath.dotproduct(R,V),alpha);
+    double outputG = Lightcolor.g*voxel_color.g*Ka + Lightcolor.g*voxel_color.g*Kd*(VectorMath.dotproduct(N,L)) + Lightcolor.g*voxel_color.g*Ks*Math.pow(VectorMath.dotproduct(R,V),alpha);
+    double outputB = Lightcolor.b*voxel_color.b*Ka + Lightcolor.b*voxel_color.b*Kd*(VectorMath.dotproduct(N,L)) + Lightcolor.b*voxel_color.b*Ks*Math.pow(VectorMath.dotproduct(R,V),alpha);
 
-    //System.out.println(outputR +" " +outputG +" " + outputB);
-        //System.out.println(N[0] + " " + N[1] + " " + N[2]);
-       // System.out.println(L[0] + " "+ L[1]+ " "+ L[2]);
-
-    // System.out.println(Lightcolor.r*voxel_color.r*Ka + " " + Lightcolor.r*voxel_color.r*Kd*(VectorMath.dotproduct(N,L)) + " "+ Lightcolor.r*voxel_color.r*Math.pow(VectorMath.dotproduct(R,V),alpha) );
     TFColor color = new TFColor(outputR,outputG,outputB,1);
-
 
         return color;
 }
